@@ -62,6 +62,8 @@ var reports      = require('./reports.js');
 
 function viewSaved(resource, recordSet, options) {
     if (options.addAnother) {
+        navigation.push(resource.viewUrl());
+        navigation.putInHistory(options.newResource.viewUrl());
         showResource(options.newResource, recordSet);
     } else if (options.wasNew) {
         navigation.go(resource.viewUrl());

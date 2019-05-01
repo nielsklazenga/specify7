@@ -157,6 +157,9 @@ module.exports = {
     push: function(url) {
         navigate(url, {trigger: false, replace: true});
     },
+    putInHistory: function(url) {
+        navigate(url, {trigger: false, replace: false});
+    },
     switchCollection: function(collection, nextUrl) {
         $.ajax({
             url: '/context/collection/',
