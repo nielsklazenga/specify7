@@ -27,8 +27,8 @@
     margin: 20px;
 }
 
-.appresource-data textarea {
+.appresource-data .resource-editor {
     width: 100%;
     height: 50em;
-    font-family: Consolas, "Liberation Mono", Menlo, Courier, monospace;
+    border: 1px solid;
 }

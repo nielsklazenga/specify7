@@ -36,12 +36,25 @@ const AppResourcePage = Backbone.View.extend({
     }
 });
 
+function modeForResource(appResource) {
+    if (appResource.get('mimetype') == null && appResource.get('name') === 'preferences') {
+        return "ace/mode/properties";
+    }
+    if (appResource.get('mimetype') === 'text/xml') {
+        return "ace/mode/xml";
+    }
+    if (appResource.get('mimetype') === 'jrxml/label') {
+        return "ace/mode/xml";
+    }
+    if (appResource.get('mimetype') === 'jrxml/report') {
+        return "ace/mode/xml";
+    }
+    return null;
+}
+
 const ResourceDataView = Backbone.View.extend({
     __name__: "AppResourceDataView",
     className: "appresource-data",
-    events: {
-        'keyup textarea': 'dataChanged'
-    },
     render() {
         if (this.model == null) {
             this.$el.empty();
@@ -52,10 +65,17 @@ const ResourceDataView = Backbone.View.extend({
             this.appresourceData = sards.first();
 
             if (this.appresourceData) {
-                $('<textarea spellcheck="false" wrap="off">')
-                    .text(this.appresourceData.get('data'))
-                    .attr('readonly', !userInfo.isadmin)
-                    .appendTo(this.el);
+                const editArea = $('<div class="resource-editor">').height("50em").appendTo(this.el);
+                var editor = ace.edit(editArea[0], {
+                    readOnly: !userInfo.isadmin,
+                    mode: modeForResource(this.model),
+                });
+                editor.setValue(this.appresourceData.get('data'));
+                editor.setPrintMarginColumn(null);
+                editor.clearSelection();
+                editor.on("change", () => {
+                    this.appresourceData.set('data', editor.getValue());
+                });
 
                 userInfo.isadmin && this.$el.append(
                     new SaveButton({model: this.appresourceData}).render().el
@@ -73,9 +93,6 @@ const ResourceDataView = Backbone.View.extend({
         });
 
         return this;
-    },
-    dataChanged() {
-        this.appresourceData.set('data', this.$('textarea').val());
     }
 });
 
