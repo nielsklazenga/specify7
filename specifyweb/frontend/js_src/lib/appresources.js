@@ -21,22 +21,43 @@ function makeUrl(resource) {
     }[resource.specifyModel.name];
 }
 
+function fileExtFor(resource) {
+    if (resource.specifyModel.name === 'SpViewSetObj') {
+        return ".xml";
+    }
+    const mimetype = resource.get('mimetype');
+    if (/^jrxml/.test(mimetype)) return '.jrxml';
+    if (mimetype === 'text/xml') return '.xml';
+    if (resource.get('name') === 'preferences') return '.properties';
+    return "";
+}
+
 const AppResourcePage = Backbone.View.extend({
     __name__: "AppresourcePage",
     id: "appresource-page",
     initialize({resources, selectedId}) {
-        this.selected = resources.filter(r => r.id === selectedId)[0];
+        this.selectedId = selectedId;
+        this.resources = resources;
     },
     render() {
-        new AppResourcesView(Object.assign({selectedResource: this.selected}, this.options)).render().$el.appendTo(this.el);
-        if (this.selected != null) {
-            new ResourceDataView({model: this.selected}).render().$el.appendTo(this.el);
+        const selected = this.resources.filter(r => r.id === this.selectedId)[0];
+        new AppResourcesView(Object.assign({selectedResource: selected}, this.options)).render().$el.appendTo(this.el);
+
+        if (this.selectedId != null) {
+            if (selected != null) {
+                new ResourceDataView({model: selected}).render().$el.appendTo(this.el);
+            } else {
+                $(`<p style="margin:auto">${this.options.ResourceModel.getLocalizedName()} not found.</p>`).appendTo(this.el);
+            }
         }
         return this;
     }
 });
 
 function modeForResource(appResource) {
+    if (appResource.specifyModel.name == 'SpViewSetObj') {
+        return "ace/mode/xml";
+    }
     if (appResource.get('mimetype') == null && appResource.get('name') === 'preferences') {
         return "ace/mode/properties";
     }
@@ -55,6 +76,10 @@ function modeForResource(appResource) {
 const ResourceDataView = Backbone.View.extend({
     __name__: "AppResourceDataView",
     className: "appresource-data",
+    events: {
+        'click .load-file': 'loadFile',
+        'change input': 'metadataChanged',
+    },
     render() {
         if (this.model == null) {
             this.$el.empty();
@@ -62,10 +87,23 @@ const ResourceDataView = Backbone.View.extend({
         }
 
         this.model.rget('spappresourcedatas', true).done(sards => {
+            const buttonsDiv = $('<div class="specify-form-buttons">');
             this.appresourceData = sards.first();
 
             if (this.appresourceData) {
-                const editArea = $('<div class="resource-editor">').height("50em").appendTo(this.el);
+                $('<h2 class="specify-form-header">').append(
+                    $('<span class="view-title">').text(this.model.get('name'))
+                ).appendTo(this.el);
+
+                $('<label class="metadata-input">Metadata: <input type="text" spellcheck="false"/><label>').appendTo(this.el);
+                $('.metadata-input input', this.el).val(this.model.get('metadata'));
+
+                if (this.model.specifyModel.name === 'SpAppResource') {
+                    $('<label class="mimetype-input">Mimetype: <input type="text" spellcheck="false"/><label>').appendTo(this.el);
+                    $('.mimetype-input input', this.el).val(this.model.get('mimetype'));
+                }
+
+                const editArea = $('<div class="resource-editor">').appendTo(this.el);
                 var editor = ace.edit(editArea[0], {
                     readOnly: !userInfo.isadmin,
                     mode: modeForResource(this.model),
@@ -74,25 +112,67 @@ const ResourceDataView = Backbone.View.extend({
                 editor.setPrintMarginColumn(null);
                 editor.clearSelection();
                 editor.on("change", () => {
-                    this.appresourceData.set('data', editor.getValue());
+                    this.appresourceData.set('data', editor.getValue(), {changedBy: editor});
                 });
 
-                userInfo.isadmin && this.$el.append(
-                    new SaveButton({model: this.appresourceData}).render().el
+                this.appresourceData.on('change:data', (resource, value, options) => {
+                    if (options.changedBy != editor) {
+                        editor.setValue(this.appresourceData.get('data'));
+                        editor.clearSelection();
+                    }
+                });
+
+                userInfo.isadmin && buttonsDiv.append(
+                    '<a class="load-file">Load File</a>',
+                    new SaveButton({model: this.appresourceData})
+                        .on('savecomplete', () => this.model.save()) // so the save button does both
+                        .render().el
                 );
+
+                const blob = new Blob([this.appresourceData.get('data')], {type: this.model.get('mimetype') || ""});
+                const url = (window.URL || window.webkitURL).createObjectURL(blob);
+                $('<a>Download</a>').attr({
+                    href: url,
+                    download: this.model.get('name') + fileExtFor(this.model)
+                }).appendTo(buttonsDiv);
             } else {
                 $('<p>This app resource appears to be corrupt but may be in the process of being saved by another '
                   + 'session. It can be deleted if that is not the case.</p>').appendTo(this.el);
             }
 
-            userInfo.isadmin &&  this.$el.append(
+            userInfo.isadmin &&  buttonsDiv.append(
                 new DeleteButton({model: this.model}).render()
                     .on('deleted', () => navigation.go('/specify/appresources/'))
                     .el
             );
+
+            this.$el.append(buttonsDiv);
         });
 
         return this;
+    },
+    metadataChanged() {
+        this.model.set('mimetype', $('.mimetype-input input', this.el).val());
+        this.model.set('metadata', $('.metadata-input input', this.el).val());
+        this.appresourceData.trigger('saverequired'); // this is bad.
+    },
+    loadFile() {
+        const fileInput = $('<input type="file">');
+        const dialog = $('<div><p>Select the file to be loaded into the editor.</p></div>').append(fileInput).dialog({
+            modal: true,
+            title: "Load file",
+            close: function() { $(this).remove(); },
+            buttons: { Cancel() { $(this).dialog('close'); } }
+        });
+        fileInput.on('change', () => {
+            const file = fileInput[0].files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = e => this.appresourceData.set('data', e.target.result);
+                reader.readAsText(file);
+                dialog.dialog('close');
+            }
+        });
     }
 });
 
@@ -135,7 +215,7 @@ const ResourceList = Backbone.View.extend({
             this.views.map(v => v.render().el)
         );
         if (userInfo.isadmin) {
-            this.$el.append('<li class="new-resource">New Resource</li>');
+            this.$el.append(`<li class="new-resource">New ${this.ResourceModel.getLocalizedName()}</li>`);
         }
         return this;
     },
@@ -149,10 +229,9 @@ const ResourceList = Backbone.View.extend({
             });
             return Q(resource.save()).then(() => resource);
         }).then(resource => {
-            const resourceData = new schema.models.SpAppResourceData.Resource({
-                spappresource: resource.get('resource_uri'),
-                data: ""
-            });
+            const resourceFieldName = this.ResourceModel.getField('spappresourcedatas').getReverse().name;
+            const resourceData = new schema.models.SpAppResourceData.Resource({data: ""});
+            resourceData.set(resourceFieldName, resource.get('resource_uri'));
             return Q(resourceData.save()).then(() => resource);
         }).done(resource => {
             navigation.go(makeUrl(resource));
@@ -189,17 +268,29 @@ const AppResourcesView = Backbone.View.extend({
         this.$el.append(
             $('<h2>').text(this.options.ResourceModel.getLocalizedName()),
             new GlobalResourcesView(this.options).render().el,
-            $('<div>').append(
-                '<h3 class="toggle-content">Disciplines</h3>',
-                new DisciplinesView(this.options).render().el
-            )
+            new DisciplinesView(this.options).render().el
         );
         return this;
     },
     toggle(evt) {
-        $(evt.currentTarget).next().slideToggle();
+        const toToggle = $(evt.currentTarget).next();
+        setStoredToggleState(this.options.ResourceModel, $(evt.currentTarget).data('appdir'), !toToggle.is(":visible"));
+        toToggle.slideToggle();
     }
 });
+
+function getStoredToggleState(resourceModel, levelKey) {
+    const key = `AppResource.visibleDirs.${resourceModel.name}.${userInfo.id}`;
+    const toggleStates = JSON.parse(window.localStorage.getItem(key) || "{}");
+    return !!toggleStates[levelKey];
+}
+
+function setStoredToggleState(resourceModel, levelKey, state) {
+    const key = `AppResource.visibleDirs.${resourceModel.name}.${userInfo.id}`;
+    const toggleStates = JSON.parse(window.localStorage.getItem(key) || "{}");
+    toggleStates[levelKey] = state;
+    window.localStorage.setItem(key, JSON.stringify(toggleStates));
+}
 
 const GlobalResourcesView = Backbone.View.extend({
     __name__: "GlobalResourcesView",
@@ -225,8 +316,9 @@ const GlobalResourcesView = Backbone.View.extend({
     },
     render() {
         this.$el.append(
-            '<h3 class="toggle-content">Global Resources</h3>',
-            this.resourceList.render().$el.toggle(this.resourceList.containsSelected)
+            `<h3 class="toggle-content" data-appdir="global">Global <small>(${this.resourceList.resources.length})</small></h3>`,
+            this.resourceList.render().$el
+                .toggle(this.resourceList.containsSelected || getStoredToggleState(this.options.ResourceModel, 'global'))
         );
         return this;
     },
@@ -257,11 +349,14 @@ const DisciplinesView = Backbone.View.extend({
         );
 
         this.containsSelected = this.views.some(v => v.containsSelected);
+        this.count = this.views.reduce((a, v) => a + v.count, 0);
     },
     render() {
         this.$el.append(
-            this.views.map(v => v.render().el)
-        ).toggle(this.containsSelected);
+            `<h3 class="toggle-content" data-appdir="disciplines">Disciplines <small>(${this.count})</small></h3>`,
+            $('<div>').append(this.views.map(v => v.render().el))
+                .toggle(this.containsSelected || getStoredToggleState(this.options.ResourceModel, 'disciplines'))
+        );
         return this;
     }
 });
@@ -299,14 +394,19 @@ const DisciplineResourcesView = Backbone.View.extend({
 
         this.containsSelected = this.resourceList.containsSelected ||
             this.collectionViews.some(v => v.containsSelected);
+
+        this.count = this.resources.length + this.collectionViews.reduce((a, v) => a + v.count, 0);
     },
     render() {
         this.$el.append(
-            $('<h3 class="toggle-content">').text(this.discipline.get('name')),
+            $('<h3 class="toggle-content">')
+                .data('appdir', this.discipline.get('resource_uri'))
+                .text(this.discipline.get('name'))
+                .append(` <small>(${this.count})</small>`),
             $('<div>').append(
                 this.resourceList.render().el,
                 this.collectionViews.map(v => v.render().el)
-            ).toggle(this.containsSelected)
+            ).toggle(this.containsSelected || getStoredToggleState(this.options.ResourceModel, this.discipline.get('resource_uri')))
         );
         return this;
     },
@@ -362,17 +462,26 @@ const CollectionResourcesView = Backbone.View.extend({
         this.containsSelected = this.resourceList.containsSelected ||
             this.userTypeView.containsSelected ||
             this.userView.containsSelected;
+
+        this.count = this.resources.length + this.userTypeView.count + this.userView.count;
     },
     render() {
         this.$el.append(
-            $('<h4 class="toggle-content">').text(this.collection.get('collectionname')),
+            $('<h4 class="toggle-content">')
+                .data('appdir', this.collection.get('resource_uri'))
+                .text(this.collection.get('collectionname'))
+                .append(` <small>(${this.count})</small>`),
             $('<div>').append(
                 this.resourceList.render().el,
-                $('<h5 class="toggle-content">').text("User Types"),
+                $('<h5 class="toggle-content" data-appdir="usertypes">')
+                    .text('User Types')
+                    .append(` <small>(${this.userTypeView.count})</small>`),
                 this.userTypeView.render().el,
-                $('<h5 class="toggle-content">').text("Users"),
+                $('<h5 class="toggle-content" data-appdir="users">')
+                    .text('Users')
+                    .append(` <small>(${this.userView.count})</small>`),
                 this.userView.render().el
-            ).toggle(this.containsSelected)
+            ).toggle(this.containsSelected || getStoredToggleState(this.options.ResourceModel, this.collection.get('resource_uri')))
         );
         return this;
     },
@@ -405,9 +514,11 @@ const UserTypeView = Backbone.View.extend({
         );
 
         this.containsSelected = this.views.some(v => v.containsSelected);
+        this.count = this.views.reduce((a, v) => a + v.count, 0);
     },
     render() {
-        this.$el.append(this.views.map(v => v.render().el)).toggle(this.containsSelected);
+        this.$el.append(this.views.map(v => v.render().el))
+            .toggle(this.containsSelected || getStoredToggleState(this.options.ResourceModel, 'usertypes'));
         return this;
     }
 });
@@ -436,11 +547,16 @@ const UserTypeResourcesView = Backbone.View.extend({
         });
 
         this.containsSelected = this.resourceList.containsSelected;
+        this.count = this.resources.length;
     },
     render() {
         this.$el.append(
-            $('<h4 class="toggle-content">').text(this.usertype),
-            this.resourceList.render().$el.toggle(this.containsSelected)
+            $('<h4 class="toggle-content">')
+                .data('appdir', 'usertype-' + this.usertype)
+                .text(this.usertype)
+                .append(` <small>(${this.count})</small>`),
+            this.resourceList.render().$el
+                .toggle(this.containsSelected || getStoredToggleState(this.options.ResourceModel, 'usertype-' + this.usertype))
         );
         return this;
     },
@@ -474,9 +590,11 @@ const UserView = Backbone.View.extend({
         );
 
         this.containsSelected = this.views.some(v => v.containsSelected);
+        this.count = this.views.reduce((a, v) => a + v.count, 0);
     },
     render() {
-        this.$el.append(this.views.map(v => v.render().el)).toggle(this.containsSelected);
+        this.$el.append(this.views.map(v => v.render().el))
+            .toggle(this.containsSelected || getStoredToggleState(this.options.ResourceModel, 'users'));
         return this;
     }
 });
@@ -506,11 +624,16 @@ const UserResourcesView = Backbone.View.extend({
         });
 
         this.containsSelected = this.resourceList.containsSelected;
+        this.count = this.resources.length;
     },
     render() {
         this.$el.append(
-            $('<h4 class="toggle-content">').text(this.user.get('name')),
-            this.resourceList.render().$el.toggle(this.containsSelected)
+            $('<h4 class="toggle-content">')
+                .data('appdir', this.user.get('resource_uri'))
+                .text(this.user.get('name'))
+                .append(` <small>(${this.count})</small>`),
+            this.resourceList.render().$el
+                .toggle(this.containsSelected || getStoredToggleState(this.options.ResourceModel, this.user.get('resource_uri')))
         );
         return this;
     },
