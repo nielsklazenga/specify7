@@ -5,6 +5,9 @@ const $ = require('jquery');
 const Q = require('q');
 const Backbone = require('./backbone.js');
 const _ = require('underscore');
+const ace = require('brace');
+require('brace/mode/xml');
+require('brace/mode/properties');
 
 const app = require('./specifyapp.js');
 const schema = require('./schema.js');
@@ -106,8 +109,8 @@ const ResourceDataView = Backbone.View.extend({
                 const editArea = $('<div class="resource-editor">').appendTo(this.el);
                 var editor = ace.edit(editArea[0], {
                     readOnly: !userInfo.isadmin,
-                    mode: modeForResource(this.model),
                 });
+                editor.getSession().setMode(modeForResource(this.model));
                 editor.setValue(this.appresourceData.get('data'));
                 editor.setPrintMarginColumn(null);
                 editor.clearSelection();
