@@ -4,6 +4,7 @@
     display: flex;
     width: 100%;
     justify-content: left;
+    align-items: start;
 }
 
 #appresources-view {
@@ -11,7 +12,6 @@
     background: #f1f2f2;
     box-shadow: 0 0 4px rgba(0,0,0,.33), 0 2px 4px rgba(0,0,0,.5);
     border: 1px solid #ddd;
-    display: table;
 }
 
 #appresources-view div {
@@ -43,7 +43,6 @@
     background: #f1f2f2;
     box-shadow: 0 0 4px rgba(0,0,0,.33), 0 2px 4px rgba(0,0,0,.5);
     border: 1px solid #ddd;
-    display: table;
 }
 
 .appresource-data .resource-editor {
