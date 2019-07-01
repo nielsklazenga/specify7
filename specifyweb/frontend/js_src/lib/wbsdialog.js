@@ -76,8 +76,9 @@ const uniquifyName = require('./wbuniquifyname.js');
 
 
 module.exports =  Backbone.View.extend({
-        __name__: "WbsDialog",
-        className: "wbs-dialog table-list-dialog",
+    __name__: "WbsDialog",
+    className: "wbs-dialog table-list-dialog",
+    events: {'click .edit-mapping': 'editMapping'},
         initialize: function(options) {
             this.wbs = options.wbs.models;
         },
@@ -104,7 +105,9 @@ module.exports =  Backbone.View.extend({
             var entry = $('<tr>').append(
                 $('<td>').append(img),
                 $('<td>').append(link),
-                $('<td class="item-count" style="display:none">'));
+                $('<td class="item-count" style="display:none">'),
+                $('<td class="edit-mapping">edit mapping</td>')
+            );
 
             _.delay(function() {
                 wb.getRelatedObjectCount('workbenchrows').done(function(count) {
@@ -115,6 +118,13 @@ module.exports =  Backbone.View.extend({
         },
         newWB: function() {
             new NewWorkbenchDialog().render();
-        }
+        },
+    editMapping(event) {
+        const i = this.$('.edit-mapping').index(event.currentTarget);
+        this.wbs[i].rget('workbenchtemplate', true).done(
+            existingTemplate => new WBTemplateEditor({existingTemplate: existingTemplate})
+                .on('created', template => template.save()).render()
+        );
+    }
     });
 

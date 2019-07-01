@@ -6,6 +6,7 @@ var _         = require('underscore');
 var Backbone  = require('./backbone.js');
 var Bacon     = require('baconjs');
 var Immutable = require('immutable');
+var Q = require('q');
 
 
 var schema     = require('./schema.js');
@@ -98,13 +99,23 @@ function makeMappingLI(selectedMapping, colMapping) {
             $('<span>').text(colMapping.get('column')))[0];
 }
 
+function newFieldLI(selectedMapping) {
+    return $('<li>')
+        .addClass(selectedMapping == null ? 'selected' : '')
+        .append(
+            $('<span>').text("New Field"),
+            $('<span class="spacer">'),
+            $('<span>').text("New Field"))[0];
+}
+
 function MappingsTray($colMappings, colMappings, selectedMapping) {
     var colMappingLIs = Bacon.combineWith(
         colMappings, selectedMapping,
         (colMappings, selectedMapping) =>
             colMappings
             .sortBy(mapping => mapping.get('curIndex'))
-            .map(mapping => makeMappingLI(selectedMapping, mapping)));
+            .map(mapping => makeMappingLI(selectedMapping, mapping))
+            .push(newFieldLI(selectedMapping)));
 
     colMappingLIs.onValue(lis => $colMappings.empty().append(lis.toArray()));
 }
@@ -114,7 +125,7 @@ function ColumnMappings(initMapping, columnsGiven, selectedMapping, selectedFiel
         initMapping,
 
         [selectedMapping, selectedField, doMap], (prev, mapping, fieldInfo) => {
-            if (columnsGiven) {
+            if (mapping) {
                 return prev.setIn([mapping.get('origIndex'), 'fieldInfo'], fieldInfo);
             } else {
                 return prev.push(Immutable.Map(
@@ -163,11 +174,15 @@ function SimpleButton($el, icon) {
     };
 }
 
-function makeTemplate(mappings) {
-    return new schema.models.WorkbenchTemplate.Resource({
-        specifyuser: userInfo.resource_uri,
-        workbenchtemplatemappingitems: makeMappingItems(mappings)
-    });
+function makeTemplate(mappings, existingTemplate) {
+    if (existingTemplate) {
+        return existingTemplate.set('workbenchtemplatemappingitems', makeMappingItems(mappings));
+    } else {
+        return new schema.models.WorkbenchTemplate.Resource({
+            specifyuser: userInfo.resource_uri,
+            workbenchtemplatemappingitems: makeMappingItems(mappings)
+        });
+    }
 }
 
 function makeMappingItems(mappings) {
@@ -177,6 +192,8 @@ function makeMappingItems(mappings) {
         .map((m, vieworder) => {
             var fieldInfo = m.get('fieldInfo');
             return new schema.models.WorkbenchTemplateMappingItem.Resource({
+                id: m.get('id'),
+                version: m.get('version'),
                 caption: m.get('column'),
                 xcoord: -1,
                 ycoord: -1,
@@ -194,16 +211,30 @@ function makeMappingItems(mappings) {
 module.exports =  Backbone.View.extend({
     __name__: "WorkbenchTemplateEditor",
     className: 'workbench-template-editor',
-    initialize: function({columns}) {
+    initialize: function({columns, existingTemplate}) {
         this.columnsIn = columns;
+        this.existingTemplate = existingTemplate;
     },
     render: function() {
-        wbschema.load().done(this._render.bind(this));
+        Q.all([wbschema.load(), this.existingTemplate && this.existingTemplate.rget('workbenchtemplatemappingitems')])
+            .done(this._render.bind(this));
         return this;
     },
-    _render: function(wbSchema) {
-        const autoMappedCols = wbSchema.autoMap(this.columnsIn);
-        const columnsWereGiven = autoMappedCols.count() > 0;
+    _render: function([wbSchema, mappings]) {
+        const existingMappings = mappings ? Immutable.List( mappings.map(
+            mapping => Immutable.Map({
+                id: mapping.get('id'),
+                version: mapping.get('version'),
+                column: mapping.get('caption'),
+                origIndex: mapping.get('vieworder'),
+                curIndex: mapping.get('vieworder'),
+                fieldInfo: wbSchema.tableInfos
+                    .find(ti => ti.name === mapping.get('tablename')).fields
+                    .find(fi => fi.name === mapping.get('fieldname'))
+            })
+        )) : this.columnsIn ? wbSchema.autoMap(this.columnsIn) : Immutable.List();
+
+        const columnsWereGiven = existingMappings.count() > 0;
 
         var editor = $(wbtemplateeditor());
         this.$el.empty().append(editor);
@@ -236,13 +267,13 @@ module.exports =  Backbone.View.extend({
         var selectedTable = SelectedTable(this.$('.wb-editor-tables'), selectedMapping);
         var selectedField = SelectedField(this.$('.wb-editor-fields'), selectedTable, selectedMapping);
 
-        var columnMappings = ColumnMappings(autoMappedCols, columnsWereGiven,
+        var columnMappings = ColumnMappings(existingMappings, columnsWereGiven,
                                             selectedMapping, selectedField,
                                             mapButton.clicks, unMapButton.clicks,
                                             moveUpButton.clicks, moveDownButton.clicks);
 
         columnMappings.sampledBy(doneButton).onValue(
-            mappings => this.trigger('created', makeTemplate(mappings)));
+            mappings => this.trigger('created', makeTemplate(mappings, this.existingTemplate)));
 
         var mappedTables = columnMappings.map(
             colMappings => colMappings

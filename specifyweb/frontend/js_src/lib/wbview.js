@@ -125,9 +125,10 @@ var WBView = Backbone.View.extend({
         'click .wb-upload-details': 'showUploadLog',
         'click .wb-setting': 'showSettingsDlg'
     },
-    initialize: function({wb, data, uploadStatus}) {
+    initialize: function({wb, data, templateVersion, uploadStatus}) {
         this.wb = wb;
         this.data = data;
+        this.templateVersion = templateVersion;
         this.uploadStatus = uploadStatus;
         this.highlightsOn = false;
     },
@@ -297,18 +298,38 @@ var WBView = Backbone.View.extend({
         $('.progress-bar', dialog).progressbar({value: false});
 
         return Q($.ajax('/api/workbench/rows/' + this.wb.id + '/', {
-            data: JSON.stringify(this.data),
-            error: this.checkDeletedFail.bind(this),
+            data: JSON.stringify({rows: this.data, template_version: this.templateVersion}),
+            error: this.checkSaveFail.bind(this),
             type: "PUT"
         })).then(data => {
-            this.data = data;
-            this.hot.loadData(data);
+            this.data = data.rows;
+            this.templateVersion = data.template_version;
+            this.hot.loadData(this.data);
             this.spreadSheetUpToDate();
         }).finally(() => dialog.dialog('close'));
     },
     checkDeletedFail(jqxhr) {
         if (jqxhr.status === 404) {
             this.$el.empty().append('Dataset was deleted by another session.');
+            jqxhr.errorHandled = true;
+        }
+    },
+    checkSaveFail(jqxhr) {
+        if (jqxhr.status === 404) {
+            this.$el.empty().append('Dataset was deleted by another session.');
+            jqxhr.errorHandled = true;
+        }
+        if (jqxhr.status === 409) {
+            $('<div>The column mappings for this dataset were changed by another session. '
+              + 'This version of the dataset cannot be saved, but the export function is '
+              + 'available for preserving changes.</div>').dialog({
+                modal: true,
+                title: "Mappings conflict",
+                close: function() { $(this).remove(); },
+                buttons: {
+                    'Ok': function() { $(this).dialog('close'); }
+                }
+              });
             jqxhr.errorHandled = true;
         }
     },
@@ -556,7 +577,8 @@ module.exports = function loadWorkbench(id) {
             app.setTitle("WorkBench: " + wb.get('name'));
             app.setCurrentView(new WBView({
                 wb: wb,
-                data: data,
+                data: data.rows,
+                templateVersion: data.template_version,
                 uploadStatus: uploadStatus
             }));
         }).catch(jqxhr => jqxhr.errorHandled || (() => {throw jqxhr;})()).done();

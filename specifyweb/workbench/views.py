@@ -29,10 +29,14 @@ def rows(request, wb_id):
     if (wb.specifyuser != request.specify_user):
         return http.HttpResponseForbidden()
     if request.method == "GET":
-        return load(wb_id)
+        data = dict(rows=load(wb_id), template_version=wb.workbenchtemplate.version)
+        return http.HttpResponse(toJson(data), content_type='application/json')
     elif request.method == "PUT":
         data = json.load(request)
-        return save(wb_id, data)
+        if data['template_version'] != wb.workbenchtemplate.version:
+            return http.HttpResponse("conflict", status=409)
+        data = dict(rows=save(wb_id, data['rows']), template_version=wb.workbenchtemplate.version)
+        return http.HttpResponse(toJson(data), content_type='application/json')
 
 def load(wb_id):
     wb = get_object_or_404(models.Workbench, id=wb_id)
@@ -63,8 +67,7 @@ def load(wb_id):
     ])
     cursor = connection.cursor()
     cursor.execute(sql, [wb_id])
-    rows = cursor.fetchall()
-    return http.HttpResponse(toJson(rows), content_type='application/json')
+    return cursor.fetchall()
 
 def load_gt_61_cols(wb_id):
     logger.info("load_gt_61_cols")
@@ -87,9 +90,7 @@ def load_gt_61_cols(wb_id):
     """
     cursor = connection.cursor()
     cursor.execute(sql, [wbtm, wb_id])
-    rows = list(group_rows(cursor.fetchall()))
-
-    return http.HttpResponse(toJson(rows), content_type='application/json')
+    return list(group_rows(cursor.fetchall()))
 
 def group_rows(rows):
     i = iter(rows)
