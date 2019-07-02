@@ -122,8 +122,10 @@ module.exports =  Backbone.View.extend({
     editMapping(event) {
         const i = this.$('.edit-mapping').index(event.currentTarget);
         this.wbs[i].rget('workbenchtemplate', true).done(
-            existingTemplate => new WBTemplateEditor({existingTemplate: existingTemplate})
-                .on('created', template => template.save()).render()
+            existingTemplate => {
+                const editor =  new WBTemplateEditor({existingTemplate: existingTemplate}).render();
+                editor.on('created', template => {template.save(); editor.close();});
+            }
         );
     }
     });

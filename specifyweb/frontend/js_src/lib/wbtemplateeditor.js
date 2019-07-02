@@ -325,6 +325,9 @@ module.exports =  Backbone.View.extend({
                 && mappings.getIn([mapping.get('origIndex'), 'curIndex']) < mappings.count() - 1);
 
         canMoveDown.onValue(moveDownButton.enable);
+    },
+    close() {
+        this.$el.dialog('close');
     }
 });
 
