@@ -122,10 +122,18 @@ module.exports =  Backbone.View.extend({
     editMapping(event) {
         const wb = this.wbs[this.$('.edit-mapping').index(event.currentTarget)];
 
-        $('<div>Warning: If the template mappings are modified while the dataset is open '
-          + 'in another session, that session will be unable to save any changes.</div>'
-         ).dialog({
-             title: "Edit Workbench Template Mappings for " + wb.get('name'),
+        const warning = $(
+            '<div><p>If the template mappings are modified while the dataset is open '
+                + 'in another session, that session will be unable to save any changes.</p>'
+                + '<p>It is recommended that if any other browser or tab is showing the dataset, '
+                + '<span style="font-weight:bold"></span>, '
+                + 'any changes be saved and the dataset closed before continuing.</p></div>'
+        );
+
+        $('span', warning).text(wb.get('name'));
+
+        warning.dialog({
+             title: "Caution",
              maxHeight: 400,
              modal: true,
              close: function() { $(this).remove(); },
