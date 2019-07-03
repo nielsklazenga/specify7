@@ -120,13 +120,31 @@ module.exports =  Backbone.View.extend({
             new NewWorkbenchDialog().render();
         },
     editMapping(event) {
-        const i = this.$('.edit-mapping').index(event.currentTarget);
-        this.wbs[i].rget('workbenchtemplate', true).done(
-            existingTemplate => {
-                const editor =  new WBTemplateEditor({existingTemplate: existingTemplate}).render();
-                editor.on('created', template => {template.save(); editor.close();});
-            }
-        );
+        const wb = this.wbs[this.$('.edit-mapping').index(event.currentTarget)];
+
+        $('<div>Warning: If the template mappings are modified while the dataset is open '
+          + 'in another session, that session will be unable to save any changes.</div>'
+         ).dialog({
+             title: "Edit Workbench Template Mappings for " + wb.get('name'),
+             maxHeight: 400,
+             modal: true,
+             close: function() { $(this).remove(); },
+             buttons: [
+                 {
+                     text: 'Continue',
+                     click() {
+                         $(this).dialog('close');
+                         wb.rget('workbenchtemplate', true).done(
+                             existingTemplate => {
+                                 const editor =  new WBTemplateEditor({existingTemplate: existingTemplate}).render();
+                                 editor.on('created', template => {template.save(); editor.close();});
+                             }
+                         );
+                     }
+                 },
+                 { text: 'Cancel', click() { $(this).dialog('close'); } }
+             ]
+         });
     }
-    });
+});
 
