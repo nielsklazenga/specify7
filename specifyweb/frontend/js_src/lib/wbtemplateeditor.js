@@ -124,39 +124,39 @@ function ColumnMappings(initMapping, columnsGiven, selectedMapping, selectedFiel
     return Bacon.update(
         initMapping,
 
-        [selectedMapping, selectedField, doMap], (prev, mapping, fieldInfo) => {
-            if (mapping) {
-                return prev.setIn([mapping.get('origIndex'), 'fieldInfo'], fieldInfo);
+        [selectedMapping, selectedField, doMap], (prev, selected, fieldInfo) => {
+            const i = prev.findIndex(mapping => mapping.get('origIndex') === selected.get('origIndex'));
+            if (selected) {
+                return prev.setIn([i, 'fieldInfo'], fieldInfo);
             } else {
                 return prev.push(Immutable.Map(
                     {column: fieldInfo.title, fieldInfo: fieldInfo, origIndex: prev.count(), curIndex: prev.count()}));
             }
         },
 
-        [selectedMapping, doUnMap], (prev, mapping) => {
+        [selectedMapping, doUnMap], (prev, selected) => {
+            const i = prev.findIndex(mapping => mapping.get('origIndex') === selected.get('origIndex'));
             if (columnsGiven) {
-                return prev.setIn([mapping.get('origIndex'), 'fieldInfo'], null);
+                return prev.setIn([i, 'fieldInfo'], null);
             } else {
-                return prev
-                    .remove(mapping.get('origIndex'))
-                    .map((m, i) => m.set('origIndex', i).set('curIndex', i));
+                return prev.remove(i).map((m, i) => m.set('origIndex', i).set('curIndex', i));
             }
         },
 
         [selectedMapping, moveUp], (prev, selected) => {
-            var current = prev.get(selected.get('origIndex'));
-            var above = prev.find(m => m.get('curIndex') === current.get('curIndex') - 1);
+            const [current, selection] = prev.findEntry(mapping => mapping.get('origIndex') === selected.get('origIndex'));
+            const above = prev.findIndex(mapping => mapping.get('curIndex') === selection.get('curIndex') - 1);
             return prev
-                .updateIn([selected.get('origIndex'), 'curIndex'], i => i - 1)
-                .updateIn([above.get('origIndex'), 'curIndex'], i => i + 1);
+                .updateIn([current, 'curIndex'], i => i - 1)
+                .updateIn([above, 'curIndex'], i => i + 1);
         },
 
         [selectedMapping, moveDown], (prev, selected) => {
-            var current = prev.get(selected.get('origIndex'));
-            var below = prev.find(m => m.get('curIndex') === current.get('curIndex') + 1);
+            const [current, selection] = prev.findEntry(mapping => mapping.get('origIndex') === selected.get('origIndex'));
+            const below = prev.findIndex(mapping => mapping.get('curIndex') === selection.get('curIndex') + 1);
             return prev
-                .updateIn([current.get('origIndex'), 'curIndex'], i => i + 1)
-                .updateIn([below.get('origIndex'), 'curIndex'], i => i - 1);
+                .updateIn([current, 'curIndex'], i => i + 1)
+                .updateIn([below, 'curIndex'], i => i - 1);
         }
     );
 }
