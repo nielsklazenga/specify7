@@ -314,15 +314,15 @@ module.exports =  Backbone.View.extend({
 
         var canMoveUp = Bacon.combineWith(
             selectedMapping, columnMappings,
-            (mapping, mappings) => mapping != null
-                && mappings.getIn([mapping.get('origIndex'), 'curIndex']) > 0);
+            (selected, mappings) => selected != null
+                && mappings.find(mapping => selected.get('origIndex') === mapping.get('origIndex')).get('curIndex') > 0);
 
         canMoveUp.onValue(moveUpButton.enable);
 
         var canMoveDown = Bacon.combineWith(
             selectedMapping, columnMappings,
-            (mapping, mappings) => mapping != null
-                && mappings.getIn([mapping.get('origIndex'), 'curIndex']) < mappings.count() - 1);
+            (selected, mappings) => selected != null
+                && mappings.find(mapping => selected.get('origIndex') === mapping.get('origIndex')).get('curIndex') < mappings.count() - 1);
 
         canMoveDown.onValue(moveDownButton.enable);
     },
