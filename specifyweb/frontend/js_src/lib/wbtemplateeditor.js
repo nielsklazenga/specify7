@@ -125,8 +125,8 @@ function ColumnMappings(initMapping, columnsGiven, selectedMapping, selectedFiel
         initMapping,
 
         [selectedMapping, selectedField, doMap], (prev, selected, fieldInfo) => {
-            const i = prev.findIndex(mapping => mapping.get('origIndex') === selected.get('origIndex'));
             if (selected) {
+                const i = prev.findIndex(mapping => mapping.get('origIndex') === selected.get('origIndex'));
                 return prev.setIn([i, 'fieldInfo'], fieldInfo);
             } else {
                 return prev.push(Immutable.Map(
