@@ -78,7 +78,6 @@ const uniquifyName = require('./wbuniquifyname.js');
 module.exports =  Backbone.View.extend({
     __name__: "WbsDialog",
     className: "wbs-dialog table-list-dialog",
-    events: {'click .edit-mapping': 'editMapping'},
         initialize: function(options) {
             this.wbs = options.wbs.models;
         },
@@ -105,8 +104,7 @@ module.exports =  Backbone.View.extend({
             var entry = $('<tr>').append(
                 $('<td>').append(img),
                 $('<td>').append(link),
-                $('<td class="item-count" style="display:none">'),
-                $('<td class="edit-mapping">edit mapping</td>')
+                $('<td class="item-count" style="display:none">')
             );
 
             _.delay(function() {
@@ -118,41 +116,6 @@ module.exports =  Backbone.View.extend({
         },
         newWB: function() {
             new NewWorkbenchDialog().render();
-        },
-    editMapping(event) {
-        const wb = this.wbs[this.$('.edit-mapping').index(event.currentTarget)];
-
-        const warning = $(
-            '<div><p>If the template mappings are modified while the dataset is open '
-                + 'in another session, that session will be unable to save any changes.</p>'
-                + '<p>It is recommended that if any other browser or tab is showing the dataset, '
-                + '<span style="font-weight:bold"></span>, '
-                + 'any changes be saved and the dataset closed before continuing.</p></div>'
-        );
-
-        $('span', warning).text(wb.get('name'));
-
-        warning.dialog({
-             title: "Caution",
-             maxHeight: 400,
-             modal: true,
-             close: function() { $(this).remove(); },
-             buttons: [
-                 {
-                     text: 'Continue',
-                     click() {
-                         $(this).dialog('close');
-                         wb.rget('workbenchtemplate', true).done(
-                             existingTemplate => {
-                                 const editor =  new WBTemplateEditor({existingTemplate: existingTemplate}).render();
-                                 editor.on('created', template => {template.save(); editor.close();});
-                             }
-                         );
-                     }
-                 },
-                 { text: 'Cancel', click() { $(this).dialog('close'); } }
-             ]
-         });
-    }
+        }
 });
 

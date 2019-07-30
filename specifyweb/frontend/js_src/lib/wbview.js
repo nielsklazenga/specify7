@@ -197,7 +197,8 @@ var WBView = Backbone.View.extend({
         var thisthis = this;
         $(settingsTemplate({
             match: this.matchWithValidate,
-            multi: this.multiMatchSetting
+            multi: this.multiMatchSetting,
+            wbid: this.wb.id
         })).dialog({
             modal: true,
             width: 'auto',

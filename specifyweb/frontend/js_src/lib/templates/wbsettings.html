@@ -1,10 +1,10 @@
-<div title="Upload/Validation settings">
+<div title="Dataset settings">
   <table>
     <tr class="wb-validate-match"><th>Match while validating</th><td><input type="checkbox" class="wb-match-chkbox"
         <% if (match) {%>
         checked
         <% } %>
-    ></input></td></tr>
+        /></td></tr>
     <tr><th>For multiple matches</th>
       <td>
         <select class="wb-upload-multiple-match-set">
@@ -26,5 +26,6 @@
         </select>
       </td>
     </tr>
+    <tr><td><a class="intercept-navigation" href="/specify/workbench-mapping/<%- wbid %>/">Edit dataset mapping</a></td></tr>
   </table>
 </div>
