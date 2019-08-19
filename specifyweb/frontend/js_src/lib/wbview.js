@@ -327,8 +327,16 @@ var WBView = Backbone.View.extend({
                 modal: true,
                 title: "Mappings conflict",
                 close: function() { $(this).remove(); },
-                buttons: {
-                    'Ok': function() { $(this).dialog('close'); }
+                  buttons: {
+                      'Export': () => {
+                          this.export();
+                          navigation.removeUnloadProtect(this);
+                          window.location.reload();
+                      },
+                      'Discard changes': () => {
+                          navigation.removeUnloadProtect(this);
+                          window.location.reload();
+                      }
                 }
               });
             jqxhr.errorHandled = true;
