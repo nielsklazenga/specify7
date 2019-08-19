@@ -31,7 +31,7 @@ module.exports = function() {
                     editor.on('created', template => {
                         editor.close();
                         template.save().done( () => navigation.go('/workbench/' + wb.id + '/'));
-                    });
+                    }).on('closed', () => navigation.go('/workbench/' + wb.id + '/'));
                 }
             );
         }, 'wbtemplateeditor');
