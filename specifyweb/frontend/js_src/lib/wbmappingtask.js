@@ -25,16 +25,39 @@ module.exports = function() {
             app.setCurrentView(new EmptyView());
 
             const wb = new schema.models.Workbench.Resource({id: id});
-            wb.rget('workbenchtemplate', true).fail(app.handleError).done(
-                template => {
-                    const editor = new Editor({existingTemplate: template}).render();
-                    editor.on('created', template => {
-                        editor.close();
-                        template.save().done( () => navigation.go('/workbench/' + wb.id + '/'));
-                    }).on('closed', () => navigation.go('/workbench/' + wb.id + '/'));
-                }
-            );
+            const goBackToWB = () => navigation.go('/workbench/' + wb.id + '/');
+
+            $(
+                '<div><p>If these template mappings are modified while this dataset is open '
+                    + 'in another session, that session will be unable to save any changes.</p>'
+                    + '<p>It is recommended that if any other browser or tab is showing this dataset, '
+                    + 'any changes be saved and the dataset closed before continuing.</p></div>'
+            ).dialog({
+                title: "Caution",
+                maxHeight: 400,
+                modal: true,
+                close() { $(this).remove(); },
+                buttons: [
+                    {
+                        text: 'Continue',
+                        click() {
+                            wb.rget('workbenchtemplate', true).fail(app.handleError).done(
+                                template => {
+                                    $(this).dialog('close');
+
+                                    const editor = new Editor({existingTemplate: template}).render();
+                                    editor.on('created', template => {
+                                        editor.close();
+                                        template.save().done( goBackToWB );
+                                    }).on('closed', goBackToWB);
+                                }
+                            );
+                        }
+                    },
+                    { text: 'Cancel', click: goBackToWB }
+                ]
+            });
+
         }, 'wbtemplateeditor');
     });
 };
-
