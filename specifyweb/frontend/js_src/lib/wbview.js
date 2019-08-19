@@ -194,8 +194,8 @@ var WBView = Backbone.View.extend({
     },
     showSettingsDlg: function(event) {
         event.preventDefault();
-        var thisthis = this;
-        $(settingsTemplate({
+        const thisthis = this;
+        const settingsD = $(settingsTemplate({
             match: this.matchWithValidate,
             multi: this.multiMatchSetting,
             wbid: this.wb.id
@@ -208,6 +208,8 @@ var WBView = Backbone.View.extend({
                 $(this).remove();
             }
         });
+
+        $('a', settingsD).button();
     },
     setupHOT: function (colHeaders, columns) {
         if (this.data.length < 1) this.data.push(Array(columns.length + 1).fill(null));
